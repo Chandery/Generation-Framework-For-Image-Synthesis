@@ -1,0 +1,22 @@
+defaults:
+  - _self_
+  - config: cyclegan
+
+hydra:
+  run:
+    dir: ${config.output_dir}/${hydra:job.name}-${now:%Y-%m-%d}/${now:%H-%M-%S}
+  
+config:
+
+  train:
+    num_workers: 8
+    batch_size: 8
+    init_lr: 0.0002
+    epoch_count: 1 # ? beginning of the training epoch
+    n_epochs: 100
+    n_epoch_decay: 100
+    display_freq: 1 # ? log image every k epoch
+
+
+  job_name: ${hydra:job.name}
+  hydra_path: ${hydra:runtime.output_dir}

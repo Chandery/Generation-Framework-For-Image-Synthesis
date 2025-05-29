@@ -1,0 +1,57 @@
+name: "cyclegan"
+
+DatasetConfig:
+  batch_size: ${config.train.batch_size}
+  num_workers: ${config.train.num_workers}
+  train_ratio: 0.8 # ? train / train + val 
+  dataroot: "/home/cc/datasets/vangogh2photo"
+  max_dataset_size: 1000 # ? limit the maximum size of the dataset
+  direction: "AtoB" # ? AtoB | BtoA
+  input_nc: 3
+  output_nc: 3
+  serial_batches: True # ? True-fixed order | False-random order
+  preprocess: "resize_and_crop" # ? resize_and_crop | crop | scale_width | scale_width_and_crop | none
+  no_flip: False # ? True-no flip | False-flip
+  load_size: 286 # ? scale image to this size
+  crop_size: 256 # ? then crop image to this size
+
+
+output_dir : "./logs/${config.name}"
+monitor: "val/G_A"
+
+CycleGAN:
+
+  in_channels: 3
+  out_channels: 3
+  netG: "resnet_9blocks" # ? resnet_9blocks | resnet_6blocks | unet_128 | unet_256
+  netD: "basic" # ? basic | n_layers | pixel
+  n_layers_D: 3
+  init_type: 'normal'
+  init_gain: 0.02
+  norm: 'batch'
+  features: 64
+  pool_size: 50 # ? Image Pool Size
+  gan_mode: 'lsgan'
+  no_dropout: True
+  lambda_identity: 0.5
+  lambda_A: 10 # ? Cycle Loss Weight
+  lambda_B: 10 # ? Cycle Loss Weight
+  direction: 'AtoB'
+  init_lr: ${config.train.init_lr}
+  beta: 0.5
+
+  scheduler_policy: # ? None means no scheduler
+    lr_policy: "linear" # ? linear | step | plateau | cosine
+    epoch_count: ${config.train.epoch_count}
+    n_epochs: ${config.train.n_epochs}
+    n_epochs_decay: ${config.train.n_epoch_decay}
+    lr_decay_iters: 50 # ? only for step scheduler
+    metric: 0 # ? only for plateau scheduler
+
+trainer:
+  benchmark: True
+  devices: [0]
+  accelerator: "auto"
+  max_epochs: None
+  precision: 16-mixed # ? faster
+  check_val_every_n_epoch: 1
