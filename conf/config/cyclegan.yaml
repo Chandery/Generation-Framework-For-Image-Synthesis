@@ -1,9 +1,11 @@
 name: "cyclegan"
 
+ckpt: "./logs/cyclegan/latest.ckpt" # ? only for test
+
 DatasetConfig:
   batch_size: ${config.train.batch_size}
   num_workers: ${config.train.num_workers}
-  train_ratio: 0.8 # ? train / train + val 
+  train_ratio: 0.8 # ? train // (train + val) 
   dataroot: "/home/cc/datasets/vangogh2photo"
   max_dataset_size: 1000 # ? limit the maximum size of the dataset
   direction: "AtoB" # ? AtoB | BtoA
@@ -36,9 +38,10 @@ CycleGAN:
   lambda_identity: 0.5
   lambda_A: 10 # ? Cycle Loss Weight
   lambda_B: 10 # ? Cycle Loss Weight
-  direction: 'AtoB'
+  direction: ${config.DatasetConfig.direction}
   init_lr: ${config.train.init_lr}
   beta: 0.5
+  val_batch_num: 5 # ? number of batch indices for validation
 
   scheduler_policy: # ? None means no scheduler
     lr_policy: "linear" # ? linear | step | plateau | cosine
@@ -54,4 +57,4 @@ trainer:
   accelerator: "auto"
   max_epochs: None
   precision: 16-mixed # ? faster
-  check_val_every_n_epoch: 1
+  check_val_every_n_epoch: 5

@@ -14,19 +14,17 @@ from torch.utils.data import DataLoader
 def main(config):
     config = config["config"]
     config.trainer.max_epochs = config.train.n_epochs + config.train.n_epoch_decay
-    filename="train_CycleGAN-epoch{epoch:02d}-"+f"{config.monitor}"+"{"+"{config.monitor}:.2f"+"}"
+    filename = f"train_CycleGAN-epoch{{epoch:02d}}-{config.monitor.replace('/', '_')}={{{config.monitor}:.2f}}"
     print("save model to", filename)
+    
     checkpoint_callback = ModelCheckpoint(
         monitor=config.monitor,
+        dirpath=config.hydra_path,
         filename=filename,
         save_top_k=1,
         mode="min",
         auto_insert_metric_name=False,
         save_last=True,
-    )
-    checkpoint_callback_last = ModelCheckpoint(
-        dirpath=config.hydra_path,
-        filename="latest",
     )
     
     train_ds = UnalignedDataset(opt=config.DatasetConfig, split="train")
@@ -40,10 +38,15 @@ def main(config):
                       batch_size=config.DatasetConfig.batch_size, 
                       shuffle=False, 
                       num_workers=config.DatasetConfig.num_workers)
+
+    val_batch_total = len(val_ds) // config.DatasetConfig.batch_size
+    model = CycleGAN(**config["CycleGAN"], 
+                     is_Train=True, 
+                     root_dir=config.hydra_path, 
+                     val_batch_total=val_batch_total
+    )
     
-    model = CycleGAN(**config["CycleGAN"], is_Train=True, root_dir=config.hydra_path, display_freq=config.train.display_freq)
-    
-    trainer = L.Trainer(**config["trainer"], callbacks=[checkpoint_callback, checkpoint_callback_last], default_root_dir=config.hydra_path)
+    trainer = L.Trainer(**config["trainer"], callbacks=[checkpoint_callback], default_root_dir=config.hydra_path)
     
     trainer.fit(model=model, train_dataloaders=train_dl, val_dataloaders=val_dl)
 

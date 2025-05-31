@@ -10,12 +10,11 @@ config:
 
   train:
     num_workers: 8
-    batch_size: 8
+    batch_size: 16
     init_lr: 0.0002
     epoch_count: 1 # ? beginning of the training epoch
     n_epochs: 100
     n_epoch_decay: 100
-    display_freq: 1 # ? log image every k epoch
 
 
   job_name: ${hydra:job.name}
