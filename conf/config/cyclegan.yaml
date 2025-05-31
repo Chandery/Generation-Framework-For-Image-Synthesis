@@ -6,7 +6,7 @@ DatasetConfig:
   batch_size: ${config.train.batch_size}
   num_workers: ${config.train.num_workers}
   train_ratio: 0.8 # ? train // (train + val) 
-  dataroot: "/home/cc/datasets/vangogh2photo"
+  dataroot: "/home/cc/datasets/apple2orange"
   max_dataset_size: 1000 # ? limit the maximum size of the dataset
   direction: "AtoB" # ? AtoB | BtoA
   input_nc: 3

@@ -183,17 +183,17 @@ class CycleGAN(L.LightningModule):
         pred_fake = netD(fake.detach())
         real_loss = self.criterionGAN(pred_real, True)
         fake_loss = self.criterionGAN(pred_fake, False)
-        D_loss = (real_loss + fake_loss) / 2
+        D_loss = (real_loss + fake_loss) * 0.5
         return D_loss
     
     def get_loss_D_A(self):
         fake_B = self.fake_B_pool.query(self.fake_B)
-        self.loss_D_A = self.loss_D_basic(self.netD_A, self.real_A, fake_B)
+        self.loss_D_A = self.loss_D_basic(self.netD_A, self.real_B, fake_B)
 
     
     def get_loss_D_B(self):
         fake_A = self.fake_A_pool.query(self.fake_A)
-        self.loss_D_B = self.loss_D_basic(self.netD_B, self.real_B, fake_A)
+        self.loss_D_B = self.loss_D_basic(self.netD_B, self.real_A, fake_A)
     
     def backward_D(self):
         self.manual_backward(self.loss_D_A)
