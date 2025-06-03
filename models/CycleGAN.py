@@ -332,8 +332,9 @@ class CycleGAN(L.LightningModule):
         # ** check if optimizer has executed step
         # ? this is for fixing the bug of lightning
         for optimizer in self.optimizers():
-            if not hasattr(optimizer, '_step_count') or optimizer._step_count == 0:
-                return  # ?if optimizer has not executed step, return
+            # ? check if optimizer has executed step
+            if len(optimizer.state) == 0:
+                return
         
         # ? update learning rate only if optimizer has executed step
         for scheduler in self.lr_schedulers():
