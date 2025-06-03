@@ -9,6 +9,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.
 from models.CycleGAN import CycleGAN
 from datasets.unaligned_dataset import UnalignedDataset
 from torch.utils.data import DataLoader
+import torch
+
+torch.set_float32_matmul_precision('high')
 
 @hydra.main(config_path="../conf", config_name="config", version_base="1.3")
 def main(config):
