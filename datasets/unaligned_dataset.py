@@ -26,8 +26,9 @@ class UnalignedDataset(BaseDataset):
         BaseDataset.__init__(self, opt)
         self.opt = opt
         phase = "train" if split == "train" or split == "val" else "test"
-        self.dir_A = os.path.join(opt.dataroot, phase + 'A')  # create a path '/path/to/data/trainA'
-        self.dir_B = os.path.join(opt.dataroot, phase + 'B')  # create a path '/path/to/data/trainB'
+        self.dataroot = os.path.join(opt.dataroot, opt.dataset_name)
+        self.dir_A = os.path.join(self.dataroot, phase + 'A')  # create a path '/path/to/data/trainA'
+        self.dir_B = os.path.join(self.dataroot, phase + 'B')  # create a path '/path/to/data/trainB'
 
         self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))   # load images from '/path/to/data/trainA'
         self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size))    # load images from '/path/to/data/trainB'
@@ -39,7 +40,7 @@ class UnalignedDataset(BaseDataset):
             self.A_paths = self.A_paths[int(len(self.A_paths) * opt.train_ratio):]
             self.B_paths = self.B_paths[int(len(self.B_paths) * opt.train_ratio):]
         elif split == "test":
-            pass
+            pass # ? test set is a unique directory
         else:
             raise ValueError(f"Invalid split: {split}")
         

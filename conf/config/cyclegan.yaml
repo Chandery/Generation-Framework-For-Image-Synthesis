@@ -1,16 +1,17 @@
 name: "cyclegan"
 
-ckpt: "./logs/cyclegan/latest.ckpt" # ? only for test
+ckpt: "/disk/cdy/Generation-Framework-for-Medical-Image/logs/cyclegan/train_CycleGAN-2025-06-01/02-33-32/train_CycleGAN-epoch924-val_G_A=0.16.ckpt" # ? only for test
 
 DatasetConfig:
   batch_size: ${config.train.batch_size}
   num_workers: ${config.train.num_workers}
   train_ratio: 0.8 # ? train // (train + val) 
-  dataroot: "/home/cc/datasets/apple2orange"
+  dataroot: "/home/cc/datasets"
+  dataset_name: "vangogh2photo" # ? dataroot/dataset_name
   max_dataset_size: 1000 # ? limit the maximum size of the dataset
   direction: "AtoB" # ? AtoB | BtoA
   input_nc: 3
-  output_nc: 3
+  output_nc: 3 
   serial_batches: True # ? True-fixed order | False-random order
   preprocess: "resize_and_crop" # ? resize_and_crop | crop | scale_width | scale_width_and_crop | none
   no_flip: False # ? True-no flip | False-flip
@@ -18,8 +19,8 @@ DatasetConfig:
   crop_size: 256 # ? then crop image to this size
 
 
-output_dir : "./logs/${config.name}"
-monitor: "val/G_A"
+output_dir : "./logs/${config.name}/${config.DatasetConfig.dataset_name}"
+monitor: "val/fid"
 
 CycleGAN:
 
@@ -30,18 +31,18 @@ CycleGAN:
   n_layers_D: 3
   init_type: 'normal'
   init_gain: 0.02
-  norm: 'batch'
+  norm: 'instance' # ? batch | instance | none
   features: 64
   pool_size: 50 # ? Image Pool Size
   gan_mode: 'lsgan'
   no_dropout: True
   lambda_identity: 0.5
-  lambda_A: 10 # ? Cycle Loss Weight
-  lambda_B: 10 # ? Cycle Loss Weight
+  lambda_A: 10 # ? Cycle Loss Weight for A
+  lambda_B: 10 # ? Cycle Loss Weight for B
   direction: ${config.DatasetConfig.direction}
   init_lr: ${config.train.init_lr}
-  beta: 0.5
-  val_batch_num: 5 # ? number of batch indices for validation
+  beta: 0.5 # ? beta for Adam optimizer
+  val_batch_num: 2 # ? number of batch indices for validation
 
   scheduler_policy: # ? None means no scheduler
     lr_policy: "linear" # ? linear | step | plateau | cosine
@@ -53,8 +54,8 @@ CycleGAN:
 
 trainer:
   benchmark: True
-  devices: [0]
+  devices: [1]
   accelerator: "auto"
   max_epochs: None
-  precision: 16-mixed # ? faster
+  # precision: 16-mixed # ? faster
   check_val_every_n_epoch: 5

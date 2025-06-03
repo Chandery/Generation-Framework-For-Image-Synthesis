@@ -70,6 +70,50 @@ class ImagePathDataset(torch.utils.data.Dataset):
             img = self.transforms(img)
         return img
 
+class ImageListDataset(torch.utils.data.Dataset):
+    def __init__(self, images, transforms=None):
+        self.images = images
+        self.transforms = transforms
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, i):
+        img = self.images[i]
+        if self.transforms is not None:
+            img = self.transforms(img)
+        return img
+
+def get_activations_from_dataloader(dataloader, model=None, dims=2048, device='cpu',):
+    if model is None:
+        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
+        model = InceptionV3([block_idx]).to(device)
+    
+    model.eval()
+    
+    pred_arr = np.empty((len(dataloader.dataset), dims))
+
+    start_idx = 0
+
+    for batch in dataloader:
+        batch = batch.to(device)
+
+        with torch.no_grad():
+            pred = model(batch)[0]
+
+        # If model output is not scalar, apply global spatial average pooling.
+        # This happens if you choose a dimensionality not equal 2048.
+        if pred.size(2) != 1 or pred.size(3) != 1:
+            pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+        pred = pred.squeeze(3).squeeze(2).cpu().numpy()
+
+        pred_arr[start_idx:start_idx + pred.shape[0]] = pred
+
+        start_idx = start_idx + pred.shape[0]
+
+    return pred_arr
+
 
 def get_activations(files, model, batch_size=50, dims=2048, device='cpu',
                     num_workers=1,transforms = None):
@@ -93,7 +137,7 @@ def get_activations(files, model, batch_size=50, dims=2048, device='cpu',
        query tensor.
     """
     model.eval()
-
+    
     if batch_size > len(files):
         print(('Warning: batch size is bigger than the data size. '
                'Setting batch size to data size'))
@@ -110,28 +154,7 @@ def get_activations(files, model, batch_size=50, dims=2048, device='cpu',
                                              drop_last=False,
                                              num_workers=num_workers)
 
-    pred_arr = np.empty((len(files), dims))
-
-    start_idx = 0
-
-    for batch in tqdm(dataloader):
-        batch = batch.to(device)
-
-        with torch.no_grad():
-            pred = model(batch)[0]
-
-        # If model output is not scalar, apply global spatial average pooling.
-        # This happens if you choose a dimensionality not equal 2048.
-        if pred.size(2) != 1 or pred.size(3) != 1:
-            pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
-
-        pred = pred.squeeze(3).squeeze(2).cpu().numpy()
-
-        pred_arr[start_idx:start_idx + pred.shape[0]] = pred
-
-        start_idx = start_idx + pred.shape[0]
-
-    return pred_arr
+    return get_activations_from_dataloader(dataloader, model, dims, device)
 
 
 def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):

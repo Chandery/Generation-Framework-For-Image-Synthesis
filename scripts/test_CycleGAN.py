@@ -17,7 +17,7 @@ def main(config):
     test_ds = UnalignedDataset(opt=config.DatasetConfig, split="test")
     
     test_dl = DataLoader(test_ds, 
-                        batch_size=config.DatasetConfig.batch_size, 
+                        batch_size=1, 
                         shuffle=True, 
                         num_workers=config.DatasetConfig.num_workers)
     

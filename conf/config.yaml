@@ -10,7 +10,7 @@ config:
 
   train:
     num_workers: 8
-    batch_size: 16
+    batch_size: 8
     init_lr: 0.0002
     epoch_count: 1 # ? beginning of the training epoch
     n_epochs: 100
