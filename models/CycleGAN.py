@@ -182,6 +182,7 @@ class CycleGAN(L.LightningModule):
             
     def test_step(self, batch, batch_idx):
         self.set_input(batch)
+        self.forward()
         
         filename = batch['A_paths'][0].split('/')[-1].split('.')[0]
         dir_name = f'{self.root_dir}/results/{filename}'

@@ -1,150 +1,94 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.models as models
 import numpy as np
-from scipy import linalg
 from skimage.metrics import structural_similarity as ssim
 from torchvision import transforms
-from typing import List, Tuple, Union
-import lpips
 from torch.utils.data import DataLoader
+import os
+import glob
+from utils.fid import (
+    ImagePathDataset,
+    get_activations_from_dataloader,
+    calculate_frechet_distance,
+)
+import lpips
+from itertools import product
 from tqdm import tqdm
 
 class MetricsCalculator:
-    def __init__(self, device='cuda:0'):
+    def __init__(self, datapath , direction="AtoB", device='cpu'):
         self.device = device
-        # 初始化Inception模型用于FID计算
-        self.inception_model = models.inception_v3(pretrained=True, transform_input=False)
-        self.inception_model.fc = nn.Identity()  # 移除最后的全连接层
-        self.inception_model = self.inception_model.to(device)
-        self.inception_model.eval()
+        self.datapath=os.path.join(datapath, "results")
+        self.direction=direction
+        self.filename_list = os.listdir(self.datapath)
+        self.file_list = [os.path.join(self.datapath, file) for file in self.filename_list]
         
-        # 初始化LPIPS模型
-        self.lpips_model = lpips.LPIPS(net='alex').to(device)
+        target_name = "B" if direction=="AtoB" else "A"
+        file_real = f"real_{target_name}*"
+        file_fake = f"fake_{target_name}*"
+        real_paths = [os.path.join(file, file_real) for file in self.file_list]
+        fake_paths = [os.path.join(file, file_fake) for file in self.file_list]
+        self.real_list = sorted([glob.glob(real_file)[0] for real_file in real_paths])
+        self.fake_list = sorted([glob.glob(fake_file)[0] for fake_file in fake_paths])
         
-        # 定义图像预处理
-        self.preprocess = transforms.Compose([
-            transforms.Resize((256, 256)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-        ])
+        self.transform = transforms.ToTensor()
+        
+        self.real_dataset = ImagePathDataset(self.real_list, self.transform)
+        self.fake_dataset = ImagePathDataset(self.fake_list, self.transform)
+        
+        self.real_dataloader = DataLoader(self.real_dataset, batch_size=1, shuffle=False, num_workers=0)
+        self.fake_dataloader = DataLoader(self.fake_dataset, batch_size=1, shuffle=False, num_workers=0)
 
-    def calculate_fid(self, real_dataloader: DataLoader, fake_dataloader: DataLoader) -> float:
-        """
-        calculate FID score (unpaired version)
-        Args:
-            real_dataloader: real images dataloader
-            fake_dataloader: fake images dataloader
-        Returns:
-            FID score
-        """
-        real_features = []
-        fake_features = []
-        
-        # 提取真实图像特征
-        with torch.no_grad():
-            for real_images in tqdm(real_dataloader, desc="extract real features"):
-                if isinstance(real_images, (list, tuple)):
-                    real_images = real_images[0]
-                real_images = real_images.to(self.device)
-                real_images = self.preprocess(real_images)
-                features = self.inception_model(real_images)
-                real_features.append(features.cpu())
-            
-            # 提取生成图像特征
-            for fake_images in tqdm(fake_dataloader, desc="extract fake features"):
-                if isinstance(fake_images, (list, tuple)):
-                    fake_images = fake_images[0]
-                fake_images = fake_images.to(self.device)
-                fake_images = self.preprocess(fake_images)
-                features = self.inception_model(fake_images)
-                fake_features.append(features.cpu())
-        
-        # 合并所有特征
-        real_features = torch.cat(real_features, dim=0)
-        fake_features = torch.cat(fake_features, dim=0)
-        
-        # 计算均值和协方差
-        mu_real = real_features.mean(0)
-        mu_fake = fake_features.mean(0)
-        sigma_real = torch.cov(real_features.T)
-        sigma_fake = torch.cov(fake_features.T)
-        
-        # 计算FID
-        ssdiff = torch.sum((mu_real - mu_fake) ** 2.0)
-        covmean = torch.matrix_power(sigma_real @ sigma_fake, 0.5)
-        
-        fid = ssdiff + torch.trace(sigma_real + sigma_fake - 2.0 * covmean)
-        return fid.item()
+    def calculate_fid(self) -> float:
+        real_activations = get_activations_from_dataloader(self.real_dataloader)
+        fake_activations = get_activations_from_dataloader(self.fake_dataloader)
+        mu_real, sigma_real = np.mean(real_activations, axis=0), np.cov(real_activations, rowvar=False)
+        mu_fake, sigma_fake = np.mean(fake_activations, axis=0), np.cov(fake_activations, rowvar=False)
+        fid = calculate_frechet_distance(mu_real, sigma_real, mu_fake, sigma_fake)
+        # print(f"FID: {fid}")
+        return fid
 
-    def calculate_ssim(self, real_images: torch.Tensor, fake_images: torch.Tensor) -> float:
+    def calculate_ssim(self, data_range=1.0) -> float:
         """
-        计算SSIM分数
-        Args:
-            real_images: 真实图像张量 [B, C, H, W]
-            fake_images: 生成图像张量 [B, C, H, W]
-        Returns:
-            SSIM分数
+        ensure that the real and fake images are paired
         """
-        # 转换为numpy数组
-        real_np = real_images.cpu().numpy()
-        fake_np = fake_images.cpu().numpy()
-        
         ssim_scores = []
-        for real, fake in zip(real_np, fake_np):
-            # 转换为[0, 1]范围
-            real = (real + 1) / 2
-            fake = (fake + 1) / 2
-            # 计算SSIM
-            score = ssim(real, fake, data_range=1.0, channel_axis=0)
-            ssim_scores.append(score)
-        
+        for real, fake in zip(self.real_dataloader, self.fake_dataloader):
+            real = real.cpu().numpy().squeeze(0)
+            fake = fake.cpu().numpy().squeeze(0)
+            ssim_value = ssim(real, fake, data_range=data_range,channel_axis=0)
+            ssim_scores.append(ssim_value)
+        # print(f"SSIM: {np.mean(ssim_scores)}")
         return np.mean(ssim_scores)
 
-    def calculate_lpips(self, real_images: torch.Tensor, fake_images: torch.Tensor) -> float:
-        """
-        计算LPIPS分数
-        Args:
-            real_images: 真实图像张量 [B, C, H, W]
-            fake_images: 生成图像张量 [B, C, H, W]
-        Returns:
-            LPIPS分数
-        """
-        with torch.no_grad():
-            lpips_score = self.lpips_model(real_images, fake_images)
-        return lpips_score.mean().item()
+    def calculate_lpips(self) -> float:
+        loss_fn = lpips.LPIPS(net='alex').to(self.device)
+        lpips_scores = []
+        for real, fake in tqdm(product(self.real_dataloader, self.fake_dataloader)):
+            real = real.to(self.device)
+            fake = fake.to(self.device)
+            loss = loss_fn(real, fake)
+            lpips_scores.append(loss.item())
+        # print(f"LPIPS: {np.mean(lpips_scores)}")
+        return np.mean(lpips_scores)
 
-    def calculate_psnr(self, real_images: torch.Tensor, fake_images: torch.Tensor) -> float:
+    def calculate_psnr(self, data_range=1.0) -> float:
         """
-        计算PSNR分数
-        Args:
-            real_images: 真实图像张量 [B, C, H, W]
-            fake_images: 生成图像张量 [B, C, H, W]
-        Returns:
-            PSNR分数
+         ensure that the real and fake images are paired
         """
-        # 转换为[0, 1]范围
-        real = (real_images + 1) / 2
-        fake = (fake_images + 1) / 2
-        
-        mse = F.mse_loss(real, fake)
-        psnr = 10 * torch.log10(1.0 / mse)
-        return psnr.item()
+        psnr_scores = []
+        for real, fake in zip(self.real_dataloader, self.fake_dataloader):
+            mse = F.mse_loss(real, fake, reduction='none')
+            psnr_value = 10 * torch.log10(data_range**2 / mse.mean())
+            psnr_scores.append(psnr_value)
+        # print(f"PSNR: {np.mean(psnr_scores)}")
+        return np.mean(psnr_scores)
 
-    def calculate_all_metrics(self, real_images: torch.Tensor, fake_images: torch.Tensor) -> dict:
-        """
-        计算所有指标
-        Args:
-            real_images: 真实图像张量 [B, C, H, W]
-            fake_images: 生成图像张量 [B, C, H, W]
-        Returns:
-            包含所有指标的字典
-        """
+    def calculate_all_metrics(self) -> dict:
         metrics = {
-            'fid': self.calculate_fid(real_images, fake_images),
-            'ssim': self.calculate_ssim(real_images, fake_images),
-            'lpips': self.calculate_lpips(real_images, fake_images),
-            'psnr': self.calculate_psnr(real_images, fake_images)
+            'fid': self.calculate_fid(),
+            'ssim': self.calculate_ssim(),
+            'lpips': self.calculate_lpips(),
+            'psnr': self.calculate_psnr()
         }
         return metrics 
