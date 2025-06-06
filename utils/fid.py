@@ -84,7 +84,7 @@ class ImageListDataset(torch.utils.data.Dataset):
             img = self.transforms(img)
         return img
 
-def get_activations_from_dataloader(dataloader, model=None, dims=2048, device='cpu',):
+def get_activations_from_dataloader(dataloader, model=None, dims=2048, device='cpu', verbose=False):
     if model is None:
         block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
         model = InceptionV3([block_idx]).to(device)
@@ -95,8 +95,11 @@ def get_activations_from_dataloader(dataloader, model=None, dims=2048, device='c
 
     start_idx = 0
 
-    for batch in dataloader:
+    for batch in tqdm(dataloader, desc="Calculating activations",total=len(dataloader), disable=not verbose):
         batch = batch.to(device)
+        
+        if batch.shape[1] == 1:
+            batch = batch.repeat(1, 3, 1, 1)
 
         with torch.no_grad():
             pred = model(batch)[0]

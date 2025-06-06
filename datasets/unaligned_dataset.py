@@ -26,12 +26,14 @@ class UnalignedDataset(BaseDataset):
         BaseDataset.__init__(self, opt)
         self.opt = opt
         phase = "train" if split == "train" or split == "val" else "test"
+        self.split = split
         self.dataroot = os.path.join(opt.dataroot, opt.dataset_name)
-        self.dir_A = os.path.join(self.dataroot, phase + 'A')  # create a path '/path/to/data/trainA'
-        self.dir_B = os.path.join(self.dataroot, phase + 'B')  # create a path '/path/to/data/trainB'
+        self.dir_A = os.path.join(self.dataroot, phase + opt.label1)  # create a path '/path/to/data/trainA'
+        self.dir_B = os.path.join(self.dataroot, phase + opt.label2)  # create a path '/path/to/data/trainB'
 
         self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))   # load images from '/path/to/data/trainA'
         self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size))    # load images from '/path/to/data/trainB'
+        # print(self.A_paths[0]," ",self.B_paths[0])
         
         if split == "train":
             self.A_paths = self.A_paths[:int(len(self.A_paths) * opt.train_ratio)]
@@ -65,13 +67,26 @@ class UnalignedDataset(BaseDataset):
             B_paths (str)    -- image paths
         """
         A_path = self.A_paths[index % self.A_size]  # make sure index is within then range
-        if self.opt.serial_batches:   # make sure index is within then range
+        if self.opt.serial_batches or self.split == "test" or self.split == "val":   # make sure index is within then range
             index_B = index % self.B_size
         else:   # randomize the index for domain B to avoid fixed pairs.
             index_B = random.randint(0, self.B_size - 1)
         B_path = self.B_paths[index_B]
-        A_img = Image.open(A_path).convert('RGB')
-        B_img = Image.open(B_path).convert('RGB')
+        
+        if self.opt.input_nc == 1:
+            A_img = Image.open(A_path).convert('L')
+        elif self.opt.input_nc == 3:
+            A_img = Image.open(A_path).convert('RGB')
+        else:
+            raise ValueError(f"Invalid input_nc: {self.opt.input_nc}")
+        
+        if self.opt.output_nc == 1:
+            B_img = Image.open(B_path).convert('L')
+        elif self.opt.output_nc == 3:
+            B_img = Image.open(B_path).convert('RGB')
+        else:
+            raise ValueError(f"Invalid output_nc: {self.opt.output_nc}")
+        
         # apply image transformation
         A = self.transform_A(A_img)
         B = self.transform_B(B_img)

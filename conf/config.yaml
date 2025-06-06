@@ -11,10 +11,10 @@ config:
   train:
     num_workers: 16
     batch_size: 8
-    init_lr: 0.0002
+    init_lr: 5e-5
     epoch_count: 1 # ? beginning of the training epoch
-    n_epochs: 100
-    n_epoch_decay: 100
+    n_epochs: 50
+    n_epoch_decay: 50
 
 
   job_name: ${hydra:job.name}

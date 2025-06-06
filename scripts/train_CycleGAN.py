@@ -33,6 +33,9 @@ def main(config):
     train_ds = UnalignedDataset(opt=config.DatasetConfig, split="train")
     val_ds = UnalignedDataset(opt=config.DatasetConfig, split="val")
     
+    print("train_ds size:", len(train_ds))
+    print("val_ds size:", len(val_ds))
+    
     train_dl = DataLoader(train_ds, 
                         batch_size=config.DatasetConfig.batch_size, 
                         shuffle=True, 

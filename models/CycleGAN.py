@@ -15,6 +15,7 @@ import random
 import os
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
+from torchvision.utils import make_grid
 
 class CycleGAN(L.LightningModule):
     def __init__(self, 
@@ -170,10 +171,13 @@ class CycleGAN(L.LightningModule):
                         Fake_list.append(img)
                     elif name == f'real_{target_name}' and batch_idx == 0:
                         Real_list.append(img)
+                if batch_idx == 0:
+                    imgs = (image+1)*127.5
+                    imgs = imgs.type(torch.uint8)
+                    row = int(image.shape[0]**0.5)
+                    grid = make_grid(imgs, nrow=row)
                     
-                    img = (img + 1) * 127.5
-                    img = img.astype(np.uint8)
-                    self.logger.experiment.add_image(f'val_images/{name}', img, k, dataformats='HWC')
+                    self.logger.experiment.add_image(f'val images/{name}', grid, self.current_epoch)
                     
             if batch_idx == 0:
                 fid = self.calculate_fid(Fake_list, Real_list)
@@ -213,7 +217,8 @@ class CycleGAN(L.LightningModule):
     def save_image(self, image, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         image = image.cpu().numpy().squeeze()
-        image = image.transpose(1, 2, 0)
+        if image.ndim == 3:
+            image = image.transpose(1, 2, 0)
         image = (image + 1) / 2.0
         image = (image * 255.0).astype(np.uint8)
         image = PIL.Image.fromarray(image)

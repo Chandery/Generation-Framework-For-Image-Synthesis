@@ -12,6 +12,8 @@ DatasetConfig:
   direction: "AtoB" # ? AtoB | BtoA
   input_nc: 3
   output_nc: 3 
+  label1: "A"
+  label2: "B"
   serial_batches: True # ? True-fixed order | False-random order
   preprocess: "resize_and_crop" # ? resize_and_crop | crop | scale_width | scale_width_and_crop | none
   no_flip: False # ? True-no flip | False-flip

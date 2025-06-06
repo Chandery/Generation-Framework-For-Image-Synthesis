@@ -37,7 +37,7 @@ def main(config):
     print("Calculating metrics...")
     
     metrics_calculator = MetricsCalculator(config.hydra_path, config.DatasetConfig.direction)
-    metrics = metrics_calculator.calculate_all_metrics()
+    metrics = metrics_calculator.calculate_all_metrics(verbose=True)
     save_csv(metrics, config.hydra_path)
     print_metrics(metrics)
     
